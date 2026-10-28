@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pool &amp; Beach Inspection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: navy header band, one centred column of cards (details, readings, checklist sections),
+   sticky progress bar with the PDF button at the bottom. Two columns on desktop inside cards, one on phones. */
+:root{
+  --bg:#eaf1f5; --surface:#ffffff; --surface-2:#f4f8fa; --ink:#0c2233; --muted:#566b7a; --line:#d3dfe6;
+  --brand:#0a3350; --brand-ink:#ffffff; --accent:#0a8aa3; --accent-soft:#dcf1f5;
+  --ok:#157a49; --ok-bg:#dcf3e6; --bad:#c0262d; --bad-bg:#fdeaea; --na:#5d6f7d; --na-bg:#e8eef2;
+  --warn:#9a6200; --warn-bg:#fff2d6; --focus:#0a8aa3; --shadow:0 1px 2px rgba(10,51,80,.06),0 6px 20px rgba(10,51,80,.06);
+  --font-d:'Sora',system-ui,-apple-system,'Segoe UI',sans-serif; --font-b:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#08141d; --surface:#10212d; --surface-2:#0c1b25; --ink:#e7eff4; --muted:#97abb9; --line:#26394a;
+    --brand:#0b2c44; --accent:#3cc3da; --accent-soft:#123845;
+    --ok:#52cb8e; --ok-bg:#12352a; --bad:#ff8084; --bad-bg:#3b1a1f; --na:#9db0bd; --na-bg:#1b2c39;
+    --warn:#f2b445; --warn-bg:#3a2d10; --focus:#3cc3da; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#08141d; --surface:#10212d; --surface-2:#0c1b25; --ink:#e7eff4; --muted:#97abb9; --line:#26394a;
+  --brand:#0b2c44; --accent:#3cc3da; --accent-soft:#123845;
+  --ok:#52cb8e; --ok-bg:#12352a; --bad:#ff8084; --bad-bg:#3b1a1f; --na:#9db0bd; --na-bg:#1b2c39;
+  --warn:#f2b445; --warn-bg:#3a2d10; --focus:#3cc3da; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--font-b);padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+h1,h2,h3,h4{font-family:var(--font-d);margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+
+/* header */
+.top{background:var(--brand);color:var(--brand-ink);position:relative;overflow:hidden;padding-top:env(safe-area-inset-top,0px)}
+.top > svg{display:none}
+.top .wrap{position:relative;display:flex;gap:16px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;padding-block:30px 40px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;font-weight:600}
+.top h1{font-size:clamp(26px,5vw,38px);line-height:1.1;margin-top:6px;font-weight:600}
+.top p{margin:8px 0 0;opacity:.85;max-width:52ch}
+.top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.draft{font-size:13px;opacity:.8}
+
+main{display:grid;gap:18px;margin-top:20px;position:relative;padding-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);min-width:0}
+.card-h{padding:18px 20px 0;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.card-h h2{font-size:18px;font-weight:600}
+.card-b{padding:16px 20px 20px}
+.sub{color:var(--muted);font-size:14px;margin:4px 0 0}
+
+/* fields */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.f{grid-column:span 4;display:flex;flex-direction:column;gap:6px;min-width:0}
+.f.w6{grid-column:span 6}.f.w3{grid-column:span 3}.f.w12{grid-column:span 12}
+.f>label,.lbl{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.f>label b,.req{color:var(--bad)}
+input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
+  width:100%;min-height:46px;padding:10px 12px;background:var(--surface-2);border:1.5px solid var(--line);border-radius:10px;min-width:0}
+textarea{resize:vertical;min-height:70px}
+input,select,textarea{text-align:center;text-align-last:center}
+input::placeholder{text-align:center}
+textarea,textarea::placeholder{text-align:left;text-align-last:auto}
+input[readonly]{background:var(--na-bg);color:var(--ink);font-weight:600;cursor:default}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.invalid input,.invalid select,.invalid textarea,input.invalid,textarea.invalid{border-color:var(--bad)!important}
+.hint{font-size:12px;min-height:18px;color:var(--muted)}
+.hint.ok{color:var(--ok)}.hint.bad{color:var(--bad);font-weight:600}
+.err{color:var(--bad);font-size:13px;font-weight:600;display:none}
+.invalid>.err,.invalid .err.show{display:block}
+
+/* signature */
+.sigbox{display:flex;flex-direction:column;gap:6px;grid-column:span 8;min-width:0}
+.pad{position:relative;background:#fff;border:1.5px dashed #8aa2b3;border-radius:10px;overflow:hidden;aspect-ratio:3/1;min-height:100px}
+.pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.pad .ph{position:absolute;left:14px;bottom:10px;color:#7b8e9c;font-size:13px;pointer-events:none;user-select:none}
+.pad .base{position:absolute;left:14px;right:14px;bottom:30px;border-bottom:1px solid #c5d3dd;pointer-events:none}
+.invalid .pad{border-color:var(--bad)}
+.sig-actions{display:flex;justify-content:space-between;align-items:center;gap:10px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:9px 18px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;font-size:15px}
+.btn:hover{border-color:var(--accent)}
+.btn.sm{min-height:36px;padding:5px 12px;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent;color:inherit;border-color:rgba(255,255,255,.35)}
+.btn.link{border:none;background:none;color:var(--accent);min-height:36px;padding:4px 8px}
+a.btn{text-decoration:none;color:inherit}
+.btn[disabled]{opacity:.6;cursor:progress}
+
+
+/* details card */
+.details{overflow:hidden}
+.dh{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.dh h2{font-size:19px;font-weight:600}
+.kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--accent);margin-bottom:2px}
+.rid{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.rid span{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.rid b{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;letter-spacing:.04em}
+.dbody{padding:22px 24px 24px;display:grid;gap:20px}
+.venue{display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--line);color:var(--accent)}
+.venue svg{flex:none}
+.venue-f{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.venue-f label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center}
+.venue-f input[readonly]{background:transparent;border:none;min-height:34px;padding:0;font-family:var(--font-d);font-size:clamp(14.5px,4.1vw,22px);font-weight:600;color:var(--ink);text-overflow:ellipsis}
+.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.meta .f{grid-column:auto}
+.insp{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,8fr);gap:24px;padding-top:20px;border-top:1px dashed var(--line);align-items:start}
+.insp-f{display:grid;gap:16px}
+.insp .f{grid-column:auto}
+.insp .sigbox{grid-column:auto}
+.pad{aspect-ratio:3.2/1;min-height:0;border-style:solid;border-color:var(--line);box-shadow:inset 0 0 0 1px rgba(10,51,80,.04)}
+.pad .x{position:absolute;left:16px;bottom:34px;font-size:15px;color:#7f93a2;pointer-events:none}
+.pad .base{left:40px;right:16px;bottom:36px;border-bottom:1.5px solid #9fb2c0}
+.pad .ph{left:0;right:0;bottom:12px;text-align:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.stamp{flex:1;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+@media (max-width:760px){
+  .dh,.dbody{padding-inline:16px}
+  .meta{grid-template-columns:1fr 1fr}.meta .f:last-child{grid-column:1/-1}
+  .insp{grid-template-columns:1fr;gap:18px}
+  .venue{padding:12px 14px;gap:12px}
+}
+
+
+/* form-sheet layout */
+.dbody.sheet{gap:0;padding:4px 24px 22px}
+.sheet .row{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px;align-items:center;padding:18px 0;border-bottom:1px solid var(--line)}
+.sheet .row.sg{align-items:start;border-bottom:none;padding-bottom:0}
+.sheet .rl{display:flex;gap:14px;align-items:center}
+.sheet .row.sg .rl{padding-top:2px}
+.sheet .ic{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);border:1px solid var(--line);transition:background .2s,color .2s}
+.sheet .row:focus-within .ic{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sheet .rt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.sheet .rt b{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--ink);letter-spacing:.005em}
+.sheet .rt small{font-size:12px;color:var(--muted);line-height:1.3}
+.sheet .rv.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.sheet .rv .f{grid-column:auto}
+.sheet .rv .f>label,.sheet .sigbox .lbl{font-size:10.5px;letter-spacing:.13em}
+.sheet .rv .f>label b{display:inline-block;margin-left:2px}
+.sheet .sigbox{grid-column:auto;max-width:560px}
+@media (max-width:760px){
+  .dbody.sheet{padding-inline:16px}
+  .sheet .row{grid-template-columns:1fr;gap:12px;padding:16px 0}
+  .sheet .ic{width:36px;height:36px}
+  /* Mobile: date, time, inspection type, inspector and position each occupy a full row. */
+  .sheet .rv.two{grid-template-columns:minmax(0,1fr)}
+  .sheet .rv.two .f,
+  .sheet .rv.two .f:last-child:nth-child(odd){grid-column:1/-1}
+  /* All inspection fields use the same full row width on mobile. */
+  .sheet .rv.two .f{width:100%;max-width:100%;min-width:0;align-items:stretch;overflow:visible}
+  .sheet .rv.two .f > label{
+    font-size:15px;font-weight:700;letter-spacing:.08em;
+    text-align:center;width:100%;
+  }
+  .sheet .rv.two input[type="date"],
+  .sheet .rv.two input[type="time"],
+  .sheet .rv.two select,
+  .sheet .rv.two input[type="text"]{
+    display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;
+    margin:0;padding:10px 12px;font-size:16px;
+    text-align:center;text-align-last:center;
+    -webkit-text-size-adjust:100%;
+  }
+  .sheet .rv.two input[type="date"]::-webkit-date-and-time-value,
+  .sheet .rv.two input[type="time"]::-webkit-date-and-time-value{
+    text-align:center;min-width:0;
+  }
+  /* iOS Safari native date/time controls have a large intrinsic minimum width.
+     Constrain every grid ancestor and the controls to the available card width. */
+  .details, .details .dbody, .sheet .row, .sheet .rv,
+  .sheet .rv.two, .sheet .rv.two .f {min-width:0;max-width:100%;box-sizing:border-box;}
+  .sheet .rv.two {width:100%;overflow:hidden;}
+  .sheet .rv.two .f {width:100%;overflow:hidden;}
+  .sheet .rv.two input[type="date"],
+  .sheet .rv.two input[type="time"] {
+    inline-size:100%!important;
+    min-inline-size:0!important;
+    max-inline-size:100%!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:hidden;
+    -webkit-appearance:none;
+    appearance:none;
+    display:block;
+  }
+  .sheet .rv.two input[type="date"]::-webkit-date-and-time-value,
+  .sheet .rv.two input[type="time"]::-webkit-date-and-time-value {
+    min-width:0;width:100%;text-align:center;
+  }
+  .sheet .rv.two input[type="date"]::-webkit-datetime-edit,
+  .sheet .rv.two input[type="time"]::-webkit-datetime-edit {
+    min-width:0;max-width:100%;padding:0;
+  }
+  /* Mobile-only: double the signing area height without stretching the strokes. */
+  .sheet .sigbox .pad{aspect-ratio:1.6/1;min-height:200px}
+}
+
+/* Conditions: labels centered above their own inputs on all screen sizes. */
+.conditions-card .f > label {text-align:center;}
+
+/* readings */
+.rd{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.rd .f{grid-column:auto}
+
+/* sections */
+.sec-count{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700;background:var(--na-bg);color:var(--na)}
+.chip.s{background:var(--ok-bg);color:var(--ok)}.chip.u{background:var(--bad-bg);color:var(--bad)}
+.items{list-style:none;margin:14px 0 0;padding:0;display:grid}
+.item{border-top:1px solid var(--line);padding:14px 20px}
+.item-main{display:flex;gap:16px;justify-content:space-between;align-items:flex-start}
+.item-text{min-width:0;flex:1}
+.item h4{font-family:var(--font-b);font-size:16px;font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item p{margin:4px 0 0;color:var(--muted);font-size:15px;font-weight:400;white-space:pre-line;max-width:64ch}
+.tag{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--accent-soft);color:var(--accent)}
+.tag.o{background:var(--na-bg);color:var(--na)}
+.seg{display:flex;flex:none;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface-2)}
+.seg label{position:relative;cursor:pointer}
+.seg label span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px;font-weight:600;font-size:14px;color:var(--muted);border-left:1.5px solid var(--line);white-space:nowrap}
+.seg label:first-child span{border-left:none}
+.seg input:focus-visible+span{outline:3px solid var(--focus);outline-offset:-3px}
+.seg .s input:checked+span{background:var(--ok);color:#fff}
+.seg .u input:checked+span{background:var(--bad);color:#fff}
+.seg .n input:checked+span{background:var(--na);color:#fff}
+:root[data-theme="dark"] .seg input:checked+span,
+:root:not([data-theme="light"]) .seg input:checked+span{color:#07131b}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .seg input:checked+span{color:#fff}}
+:root[data-theme="light"] .seg input:checked+span{color:#fff}
+.item.invalid{background:var(--warn-bg);box-shadow:inset 4px 0 0 var(--bad)}
+.item.invalid .item-main .seg{border-color:var(--bad)}
+.item[data-r="U"]{background:var(--bad-bg)}
+.finding{margin-top:12px;display:grid;gap:10px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--bad)}
+.finding label.lbl{display:block;margin-bottom:6px;text-align:center;font-size:15px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink)}
+.finding .err{text-align:center}
+.frow{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.frow .f{max-width:200px}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap}
+.thumb{position:relative;width:84px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:2px;right:2px;width:26px;height:26px;border-radius:99px;border:none;background:rgba(0,0,0,.7);color:#fff;cursor:pointer;line-height:1}
+.add{border-top:1px solid var(--line);padding:10px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.add form{display:flex;gap:10px;flex:1;min-width:240px}
+.add input{min-height:40px}
+.mark{margin-left:auto}
+
+/* sticky bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(10,51,80,.12);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bar-in{max-width:1000px;margin:0 auto;display:flex;gap:16px;align-items:center;justify-content:space-between}
+.prog{flex:1;min-width:0}
+.prog-t{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:14px;font-weight:600}
+.prog-t small{color:var(--muted);font-weight:500;font-size:13px}
+.track{height:8px;border-radius:99px;background:var(--na-bg);overflow:hidden;display:flex;margin-top:6px}
+.track i{display:block;height:100%;transition:width .25s}
+.track .s{background:var(--ok)}.track .u{background:var(--bad)}.track .n{background:var(--na)}
+.msg{font-size:13px;color:var(--bad);font-weight:600;margin-top:4px;min-height:0}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(5,15,24,.6);display:grid;place-items:center;padding:16px}
+.dlg{background:var(--surface);border-radius:16px;max-width:460px;width:100%;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.4);display:grid;gap:14px}
+.dlg h3{font-size:22px}
+.okmark{width:48px;height:48px;border-radius:99px;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center}
+.dlg .acts{display:grid;gap:10px}
+.fname{font-size:13px;color:var(--muted);word-break:break-all}
+
+@media (max-width:760px){
+  .f,.f.w6,.f.w3,.sigbox{grid-column:span 12}
+  .rd{grid-template-columns:1fr 1fr}
+  .item-main{flex-direction:column;gap:12px}
+  .seg{width:100%}.seg label{flex:1}.seg label span{padding:0 6px}
+  .card-h,.card-b,.item,.add{padding-inline:16px}
+  .top .wrap{padding-block:24px 36px}
+  .bar-in{gap:10px}.btn.primary .long{display:none}
+}
+@media (max-width:420px){.rd{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Health, Safety &amp; Operations</div>
+      <h1>Pool &amp; Beach Inspection</h1>
+      <p>Complete every item, add a comment for anything unsatisfied, sign, and the report is generated as a PDF.</p>
+    </div>
+    <div class="top-actions">
+      <span class="draft" id="draftState" aria-live="polite"></span>
+      <button class="btn ghost sm" id="resetBtn" type="button">New inspection</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+
+  <section class="card details" id="detailsCard" aria-labelledby="h-details">
+    <div class="dh">
+      <div><div class="kicker">Section A</div><h2 id="h-details">Inspection details</h2></div>
+    </div>
+    <div class="dbody sheet">
+      <div class="row"><div class="rl"><span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7l8-4 8 4v14M9 21v-6h6v6M8 10h.01M12 10h.01M16 10h.01"/></svg></span><div class="rt"><b>Resort</b><small>Property being inspected</small></div></div><div class="rv"><label class="sr" for="venue">Resort name</label><input type="text" id="venue" data-f value="Conrad Abu Dhabi Etihad Towers" autocomplete="organization"></div></div>
+      <div class="row"><div class="rl"><span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><div class="rt"><b>Inspection</b><small>Date, time and type</small></div></div><div class="rv two">
+        <div class="f" data-req="insp_date"><label for="insp_date">Date <b>*</b></label><input type="date" id="insp_date" data-f></div>
+        <div class="f" data-req="insp_time"><label for="insp_time">Time <b>*</b></label><input type="time" id="insp_time" data-f></div>
+        <div class="f"><label for="insp_type">Type</label><select id="insp_type" data-f><option>Opening</option><option>Mid-day</option><option>Closing</option><option>Ad-hoc</option></select></div></div></div>
+      <div class="row"><div class="rl"><span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></span><div class="rt"><b>Inspector</b><small>Person carrying out the check</small></div></div><div class="rv two">
+        <div class="f" data-req="insp_by"><label for="insp_by">Inspected by <b>*</b></label><input type="text" id="insp_by" data-f placeholder="Full name" autocomplete="name"><div class="err">Enter the inspector's name.</div></div>
+        <div class="f"><label for="insp_title">Position</label><input type="text" id="insp_title" data-f placeholder="e.g. Pool supervisor"></div></div></div>
+      <div class="row sg"><div class="rl"><span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><div class="rt"><b>Signature</b><small>Certifies this inspection</small></div></div><div class="rv"><div class="sigbox" data-req="sig">
+          <span class="lbl" id="sigLbl">Inspector signature <span class="req">*</span></span>
+          <div class="pad"><canvas id="sig" role="img" aria-labelledby="sigLbl"></canvas><div class="x" aria-hidden="true">&#10005;</div><div class="base"></div><div class="ph" id="sigPh">Sign above the line</div></div>
+          <div class="sig-actions"><span class="err" id="sigErr">Signature is required.</span><span class="stamp" id="stamp"></span><button class="btn link" id="sigClear" type="button">Clear</button></div></div></div></div>
+    </div>
+  </section>
+
+  <section class="card conditions-card" aria-labelledby="h-cond">
+    <div class="card-h"><div><h2 id="h-cond">Conditions &amp; water readings</h2><p class="sub">Optional. Record individual pool and sea temperatures in °C.</p></div></div>
+    <div class="card-b">
+      <div class="grid" style="margin-bottom:14px">
+        <div class="f"><label for="weather">Weather</label>
+          <select id="weather" data-f><option>Clear</option><option>Partly cloudy</option><option>Cloudy</option><option>Hot &amp; humid</option><option>Windy</option><option>Dusty / hazy</option><option>Rain</option></select></div>
+        <div class="f"><label for="sea">Sea condition</label>
+          <select id="sea" data-f><option>Calm</option><option>Moderate</option><option>Rough</option><option>Not applicable</option></select></div>
+        <div class="f"><label for="flag">Beach flag displayed</label>
+          <select id="flag" data-f><option>Green</option><option>Yellow</option><option>Red</option><option>Red + Purple (marine pests)</option><option>No flag / closed</option></select></div>
+      </div>
+      <div class="rd">
+        <div class="f"><label for="rd_adult">Adult pool temp (°C)</label><input type="number" id="rd_adult" data-f step="0.1" inputmode="decimal" placeholder="Enter temperature"><div class="hint"></div></div>
+        <div class="f"><label for="rd_main">Main pool temp (°C)</label><input type="number" id="rd_main" data-f step="0.1" inputmode="decimal" placeholder="Enter temperature"><div class="hint"></div></div>
+        <div class="f"><label for="rd_kids">Kids pool temp (°C)</label><input type="number" id="rd_kids" data-f step="0.1" inputmode="decimal" placeholder="Enter temperature"><div class="hint"></div></div>
+        <div class="f"><label for="rd_sea">Sea temp (°C)</label><input type="number" id="rd_sea" data-f step="0.1" inputmode="decimal" placeholder="optional"><div class="hint"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="sections" style="display:grid;gap:18px"></div>
+
+</main>
+</div>
+
+<div class="bar" role="region" aria-label="Progress">
+  <div class="bar-in">
+    <div class="prog">
+      <div class="prog-t"><span id="progMain">0 of 0 completed</span><small id="progSub"></small></div>
+      <div class="track" aria-hidden="true"><i class="s" id="bS"></i><i class="u" id="bU"></i><i class="n" id="bN"></i></div>
+      <div class="msg" id="msg" role="alert"></div>
+    </div>
+    <button class="btn primary" id="genBtn" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+      <span>Generate<span class="long"> PDF report</span></span>
+    </button>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="okmark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+    <h3 id="mTitle">Report generated</h3>
+    <div><div id="mSummary" style="font-weight:600"></div><div class="fname" id="mFile"></div><p class="sub">Only Unsatisfied checklist findings appear. The Corrective Action, Responsible Person, Target Date and Completed checkbox are genuine fillable PDF form controls. Type into the generated PDF and save the filled report. Open the downloaded file in Adobe Acrobat or another compatible PDF editor, complete the fields, then press Ctrl+S to save changes to that same file. If typing is unavailable in the browser viewer, download the PDF and open it in Adobe Acrobat Reader; browser previews vary in form support.</p></div>
+    <div class="acts">
+      <button class="btn primary" id="mDl" type="button">Download PDF again</button>
+      <a class="btn" id="mOpen" href="#" target="_blank" rel="noopener">Open PDF in new tab</a>
+      <button class="btn" id="mClose" type="button">Back to form</button>
+      <button class="btn link" id="mNew" type="button">Start a new inspection</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- Checklist definition ---------- */
+const SECTIONS=[
+ {id:'gen',title:'General Area & Access',items:[
+  {id:'g1',t:'General Area Condition',d:'Look for tripping/slipping hazards, condition of handrails, steps, area cleanliness.',o:1},
+  {id:'g2',t:'Pool Deck & Walkway Surfaces',d:'Non-slip surfaces intact, no standing water, no cracked or loose tiles or pavers.'},
+  {id:'g4',t:'Rules Board & Operating Hours',d:'Rules, operating hours, age and supervision restrictions, and the "No lifeguard on duty" notice (if applicable) are displayed and legible.'}]},
+ {id:'lsv',title:'Life Saving & Emergency Equipment',items:[
+  {id:'l1',t:'Life Saving Equipment',d:'Check all equipment for condition: life rescue ring, rescue tube, first aid kit, floating board, Automated External Defibrillator (AED).',o:1},
+  {id:'l2',t:'Emergency Phone',d:'Ensure emergency phone is working (Green Color box).',o:1},
+  {id:'l3',t:'First Aid Kit & AED Readiness',d:'Kit fully stocked and sealed, items within expiry date, AED pads and battery in date, status indicator OK.'},
+  {id:'l4',t:'Rescue Pole & Spinal Board',d:'Reaching pole, spinal board and head immobiliser available, accessible and undamaged.'}]},
+ {id:'clean',title:'Pool Cleaning & Water Quality',items:[
+  {id:'c1',t:'Pool Cleaning',d:'All pools have been vacuumed and swept with the equipment provided, all vacuum caps are visible and ready to be placed back after vacuuming.\nEnsure all grids, overflow areas, handrails and stone straining units are scrubbed using brushes.',o:1},
+  {id:'c2',t:'Water Clarity',d:'Main drain and pool floor clearly visible from the deck. No cloudiness, algae or floating debris.'},
+  {id:'c3',t:'Skimmer & Strainer Baskets',d:'Skimmer baskets, hair/lint strainers and gutters are clear of debris.'},
+  {id:'c4',t:'Water Chemistry Log',d:'Chlorine, pH and temperature tested and recorded (see readings above). Logbook up to date.'}]},
+ {id:'light',title:'Lighting & Signage',items:[
+  {id:'s1',t:'Lighting',d:'During evening hours, ensure that lights are all working, including underwater lights.',o:1},
+  {id:'s3',t:'Depth Markers at Pool Edge',d:'Tile depth markers visible and accurate at the pool edge and at shallow/deep transitions.'},
+  {id:'s4',t:'Hazard Signage',d:'Wet floor, slippery surface, "children must be supervised" and "no glass" signs in place.'}]},
+ {id:'pool',title:'Pool Condition & Plant',items:[
+  {id:'p1',t:'Pool Condition',d:'All suction fittings, grilles or covers are secure and in good condition.\nAll electrical sources and equipment are protected from water.',o:1},
+  {id:'p2',t:'Ladders, Handrails & Steps',d:'Securely anchored, no sharp edges, corrosion or movement.'},
+  {id:'p4',t:'Pool Furniture & Sun Loungers',d:'Clean, stable and undamaged. Positioned clear of the pool edge and walkways.'},
+  {id:'p5',t:'Showers & Foot Wash',d:'Working, clean, and drains flowing freely.'}]},
+ {id:'beach',title:'Beach Area',items:[
+  {id:'b1',t:'Beach Cleanliness & Debris',d:'Sand raked and free of glass, sharp objects, litter, seaweed build-up and animal waste.'},
+  {id:'b2',t:'Safety Flag System',d:'Flag colour is displayed and matches current sea and weather conditions (see conditions above).'},
+  {id:'b3',t:'Swimming Zone Markers',d:'Buoys and marker lines in place, correctly positioned and secured.'},
+  {id:'b4',t:'Lifeguard Station & Rescue Equipment',d:'Station staffed or "No lifeguard" notice displayed. Rescue board, torpedo buoy, binoculars and radio available and working.'},
+  {id:'b5',t:'Beach Signage',d:'Swim-at-own-risk, no diving, hours and warning signs displayed and in good condition.'},
+  {id:'b6',t:'Marine Hazards',d:'Check for jellyfish, sea snakes, red tide, strong or rip currents and other hazards. Warn guests where present.'},
+  {id:'b8',t:'Sunbeds, Umbrellas & Cabanas',d:'Set out safely, anchored against wind, no broken parts or exposed sharp points.'}]},
+ {id:'fac',title:'Guest Facilities',items:[
+  {id:'f1',t:'Towel Station & Bins',d:'Stocked, bins emptied and lined.'},
+  {id:'f2',t:'Toilets, Showers & Changing Rooms',d:'Clean and stocked. No leaks or electrical hazards.'},
+  {id:'f3',t:'Drinking Water & Shaded Areas',d:'Water points working. Shade structures safe and in good condition.'}]}
+];
+const RANGES={}; // Pool temperatures are informational unless venue-specific limits are configured.
+const KEY='pbi-draft-v1';
+const RESORT='Conrad Abu Dhabi Etihad Towers';
+
+/* ---------- State ---------- */
+const $=(s,r)=> (r||document).querySelector(s), $$=(s,r)=>[...(r||document).querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let state={fields:{},answers:{},custom:{},strokes:[]};
+let saveTimer=null, lastPdf=null;
+
+function allSections(){return SECTIONS.map(s=>({id:s.id,title:s.title,items:s.items.concat((state.custom[s.id]||[]).map(i=>Object.assign({custom:1},i)))}));}
+function allItems(){return allSections().flatMap(s=>s.items);}
+
+/* ---------- Persistence (best effort) ---------- */
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    let ok=true;
+    try{localStorage.setItem(KEY,JSON.stringify(state));}
+    catch(e){
+      try{const lite=JSON.parse(JSON.stringify(state));Object.values(lite.answers).forEach(a=>{a.ph=[]});localStorage.setItem(KEY,JSON.stringify(lite));}catch(e2){ok=false;}
+    }
+    $('#draftState').textContent=ok?'Draft saved on this device':'';
+  },350);
+}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&o.fields)state=Object.assign(state,o);}}catch(e){}}
+
+/* ---------- Rendering ---------- */
+function rowHTML(it){
+  const a=state.answers[it.id]||{};
+  const U=a.r==='U';
+  const thumbs=(a.ph||[]).map((p,i)=>`<div class="thumb"><img src="${p.d}" alt="Evidence photo ${i+1}"><button type="button" data-act="rmphoto" data-id="${it.id}" data-i="${i}" aria-label="Remove photo ${i+1}">×</button></div>`).join('');
+  return `<li class="item" id="row_${it.id}" data-id="${it.id}" data-r="${a.r||''}">
+    <div class="item-main">
+      <div class="item-text"><h4>${esc(it.t)} ${it.custom?`<span class="tag">Custom</span>`:''}${it.custom?`<button class="btn link" type="button" data-act="rmitem" data-id="${it.id}">Remove</button>`:''}</h4>${it.d?`<p>${esc(it.d)}</p>`:''}</div>
+      <div class="seg" role="radiogroup" aria-label="Result for ${esc(it.t)}">
+        <label class="s"><input class="sr" type="radio" name="r_${it.id}" value="S" ${a.r==='S'?'checked':''}><span>Satisfied</span></label>
+        <label class="u"><input class="sr" type="radio" name="r_${it.id}" value="U" ${U?'checked':''}><span>Unsatisfied</span></label>
+        <label class="n"><input class="sr" type="radio" name="r_${it.id}" value="NA" ${a.r==='NA'?'checked':''}><span>N/A</span></label>
+      </div>
+    </div>
+    ${U?`<div class="finding" data-fid="${it.id}">
+      <div><label class="lbl" for="c_${it.id}">What is wrong, and what action is needed? <span class="req">*</span></label>
+      <textarea id="c_${it.id}" data-cm="${it.id}" rows="3" placeholder="Describe the issue, its location and the action required">${esc(a.c||'')}</textarea>
+      <div class="err">A comment is required for unsatisfied items.</div></div>
+      <div class="frow">
+        <div class="f"><label for="p_${it.id}">Priority</label><select id="p_${it.id}" data-pr="${it.id}">${['Low','Medium','High'].map(p=>`<option ${((a.p||'Medium')===p)?'selected':''}>${p}</option>`).join('')}</select></div>
+        <label class="btn sm" style="cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Add photo<input class="sr" type="file" accept="image/*" multiple data-photo="${it.id}"></label>
+      </div>
+      ${thumbs?`<div class="thumbs">${thumbs}</div>`:''}
+    </div>`:''}
+  </li>`;
+}
+function renderSections(){
+  const host=$('#sections');
+  host.innerHTML=allSections().map((s,si)=>`
+   <section class="card" id="sec_${s.id}" aria-labelledby="h_${s.id}">
+    <div class="card-h"><div><h2 id="h_${s.id}">${si+1}. ${esc(s.title)}</h2>
+      <div class="sec-count" id="cnt_${s.id}"></div></div>
+      <button class="btn sm" type="button" data-act="allok" data-sec="${s.id}">Mark all Satisfied</button></div>
+    <ul class="items">${s.items.map(rowHTML).join('')}</ul>
+    <div class="add"><form data-addform="${s.id}"><input type="text" id="add_${s.id}" placeholder="Add your own item to this section" aria-label="New item for ${esc(s.title)}" maxlength="120"><button class="btn sm" type="submit">Add item</button></form></div>
+   </section>`).join('');
+  updateProgress();
+}
+function refreshRow(id){
+  const it=allItems().find(i=>i.id===id); const el=$('#row_'+id); if(!it||!el)return;
+  const tmp=document.createElement('div'); tmp.innerHTML=rowHTML(it); el.replaceWith(tmp.firstElementChild);
+}
+
+function counts(items){
+  const c={S:0,U:0,NA:0,n:items.length};
+  items.forEach(i=>{const r=(state.answers[i.id]||{}).r; if(r) c[r]++;});
+  c.done=c.S+c.U+c.NA; return c;
+}
+function updateProgress(){
+  const secs=allSections(), all=counts(allItems());
+  $('#progMain').textContent=`${all.done} of ${all.n} completed`;
+  $('#progSub').textContent=`${all.S} satisfied · ${all.U} unsatisfied · ${all.NA} N/A`;
+  const pct=v=>(all.n?v/all.n*100:0)+'%';
+  $('#bS').style.width=pct(all.S);$('#bU').style.width=pct(all.U);$('#bN').style.width=pct(all.NA);
+  secs.forEach(s=>{
+    const c=counts(s.items), el=$('#cnt_'+s.id); if(!el)return;
+    el.innerHTML=`<span>${c.done}/${c.n} done</span>${c.S?`<span class="chip s">${c.S} satisfied</span>`:''}${c.U?`<span class="chip u">${c.U} unsatisfied</span>`:''}${c.NA?`<span class="chip">${c.NA} N/A</span>`:''}`;
+  });
+}
+
+/* ---------- Fields ---------- */
+function applyFields(){
+  $$('[data-f]').forEach(el=>{ if(state.fields[el.id]!==undefined) el.value=state.fields[el.id]; });
+}
+function updateRid(){
+  const f=state.fields;
+  const st=$('#stamp'); if(st) st.textContent=state.strokes.length?`Signed ${fmtDate(f.insp_date)}, ${f.insp_time||''}`:'';
+}
+function defaults(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  if(!state.fields.venue) state.fields.venue=RESORT;
+  if(!state.fields.insp_date) state.fields.insp_date=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  if(!state.fields.insp_time) state.fields.insp_time=`${p(d.getHours())}:${p(d.getMinutes())}`;
+  $$('select[data-f]').forEach(el=>{ if(state.fields[el.id]===undefined) state.fields[el.id]=el.options[0].value; });
+}
+
+/* ---------- Signature ---------- */
+const pad=$('#sig'), pctx=pad.getContext('2d');
+function drawStrokes(c,w,h,strokes,color,lw){
+  c.lineCap='round';c.lineJoin='round';c.strokeStyle=color;c.fillStyle=color;c.lineWidth=lw;
+  strokes.forEach(s=>{
+    if(s.length===1){c.beginPath();c.arc(s[0][0]*w,s[0][1]*h,lw/2,0,6.283);c.fill();return;}
+    c.beginPath();
+    s.forEach((p,i)=>{const x=p[0]*w,y=p[1]*h; if(i===0)c.moveTo(x,y); else{const q=s[i-1],mx=(q[0]*w+x)/2,my=(q[1]*h+y)/2;c.quadraticCurveTo(q[0]*w,q[1]*h,mx,my);}});
+    c.stroke();
+  });
+}
+function redrawPad(){
+  const w=pad.width,h=pad.height; pctx.clearRect(0,0,w,h);
+  drawStrokes(pctx,w,h,state.strokes,'#0a3fd0',Math.max(3,w*.0075));
+  $('#sigPh').style.display=state.strokes.length?'none':'';
+}
+function sizePad(){
+  const r=pad.getBoundingClientRect(); if(!r.width)return;
+  const dpr=Math.max(1,window.devicePixelRatio||1);
+  pad.width=Math.round(r.width*dpr); pad.height=Math.round(r.height*dpr); redrawPad();
+}
+let drawing=null;
+function pt(e){const r=pad.getBoundingClientRect();return [Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))];}
+pad.addEventListener('pointerdown',e=>{e.preventDefault();try{pad.setPointerCapture(e.pointerId);}catch(_){}drawing=[pt(e)];state.strokes.push(drawing);redrawPad();});
+pad.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();drawing.push(pt(e));redrawPad();});
+const endStroke=()=>{if(!drawing)return;drawing=null;clearSigError();updateRid();save();};
+pad.addEventListener('pointerup',endStroke);pad.addEventListener('pointercancel',endStroke);
+$('#sigClear').addEventListener('click',()=>{state.strokes=[];redrawPad();updateRid();save();});
+function clearSigError(){const b=$('[data-req="sig"]');b.classList.remove('invalid');}
+function signaturePng(){
+  if(!state.strokes.length)return null;
+  const c=document.createElement('canvas');c.width=960;c.height=300;
+  drawStrokes(c.getContext('2d'),960,300,state.strokes,'#0a3fd0',13);
+  return c.toDataURL('image/png');
+}
+
+/* ---------- Photos ---------- */
+function compress(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onerror=rej;
+    fr.onload=()=>{
+      const img=new Image();
+      img.onerror=rej;
+      img.onload=()=>{
+        const max=1100,k=Math.min(1,max/Math.max(img.width,img.height));
+        const w=Math.round(img.width*k),h=Math.round(img.height*k);
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);
+        res({d:c.toDataURL('image/jpeg',.78),w,h});
+      };
+      img.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.matches('[data-f]')){
+    state.fields[t.id]=t.value;
+    updateRid();
+    const w=t.closest('[data-req]'); if(w&&t.value)w.classList.remove('invalid');
+    save();
+  } else if(t.matches('[data-cm]')){
+    const a=state.answers[t.dataset.cm]; a.c=t.value; t.classList.remove('invalid'); save();
+  }
+});
+document.addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.matches('input[type=radio]')&&t.name.startsWith('r_')){
+    const id=t.name.slice(2); const a=state.answers[id]=state.answers[id]||{};
+    a.r=t.value; if(a.r!=='U'){delete a.c;} else if(!a.p){a.p='Medium';}
+    refreshRow(id); updateProgress(); save(); $('#msg').textContent='';
+    if(a.r==='U'){const ta=$('#c_'+id); if(ta)ta.focus({preventScroll:true});}
+    else{
+      const rb=$(`input[name="r_${id}"][value="${a.r}"]`); if(rb)rb.focus({preventScroll:true});
+      setTimeout(()=>{
+        const rows=$$('.item'), i=rows.findIndex(r=>r.dataset.id===id), nx=rows[i+1];
+        if(nx)nx.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+      },140);
+    }
+  } else if(t.matches('[data-pr]')){
+    state.answers[t.dataset.pr].p=t.value; save();
+  } else if(t.matches('[data-photo]')){
+    const id=t.dataset.photo, a=state.answers[id]; a.ph=a.ph||[];
+    for(const f of [...t.files]){ if(a.ph.length>=4)break; try{a.ph.push(await compress(f));}catch(_){} }
+    refreshRow(id); save();
+  }
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const act=b.dataset.act;
+  if(act==='allok'){
+    const s=allSections().find(x=>x.id===b.dataset.sec);
+    s.items.forEach(i=>{const a=state.answers[i.id]=state.answers[i.id]||{}; if(!a.r){a.r='S';}});
+    renderSections(); save();
+  } else if(act==='rmphoto'){
+    const a=state.answers[b.dataset.id]; a.ph.splice(+b.dataset.i,1); refreshRow(b.dataset.id); save();
+  } else if(act==='rmitem'){
+    const id=b.dataset.id;
+    Object.keys(state.custom).forEach(k=>{state.custom[k]=state.custom[k].filter(i=>i.id!==id);});
+    delete state.answers[id]; renderSections(); save();
+  }
+});
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-addform]'); if(!f)return; e.preventDefault();
+  const sid=f.dataset.addform, inp=$('#add_'+sid), t=inp.value.trim(); if(!t)return;
+  (state.custom[sid]=state.custom[sid]||[]).push({id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),t:t,d:''});
+  renderSections(); save(); const n=$('#add_'+sid); if(n)n.focus({preventScroll:true});
+});
+
+/* reset (two-step, no browser dialogs) */
+let resetArm=null;
+$('#resetBtn').addEventListener('click',function(){
+  if(!resetArm){this.textContent='Tap again to clear all';resetArm=setTimeout(()=>{this.textContent='New inspection';resetArm=null;},3500);return;}
+  clearTimeout(resetArm);resetArm=null;this.textContent='New inspection';newInspection();
+});
+function newInspection(){
+  const keep={venue:state.fields.venue,insp_by:state.fields.insp_by,insp_title:state.fields.insp_title};
+  state={fields:keep,answers:{},custom:state.custom,strokes:[]};
+  defaults(); $$('[data-f]').forEach(el=>{el.value='';}); applyFields(); renderSections(); redrawPad(); updateRid();
+  $$('.invalid').forEach(n=>n.classList.remove('invalid')); $('#msg').textContent='';
+  save(); window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- Validation ---------- */
+function validate(){
+  const errs=[]; $$('.invalid').forEach(n=>n.classList.remove('invalid'));
+  ['insp_date','insp_time','insp_by'].forEach(k=>{ if(!String(state.fields[k]||'').trim()){const w=$('[data-req="'+k+'"]');w.classList.add('invalid');errs.push({el:$('#'+k),msg:'details'});} });
+  if(!state.strokes.length){const w=$('[data-req="sig"]');w.classList.add('invalid');errs.push({el:$('#sig'),msg:'signature'});}
+  allItems().forEach(i=>{
+    const a=state.answers[i.id]||{}, row=$('#row_'+i.id);
+    if(!a.r){row.classList.add('invalid');errs.push({el:row,msg:'unanswered'});}
+    else if(a.r==='U'&&!String(a.c||'').trim()){const ta=$('#c_'+i.id);ta.classList.add('invalid');errs.push({el:ta,msg:'comment'});}
+  });
+  return errs;
+}
+
+/* ---------- PDF ---------- */
+function clean(s){
+  return String(s==null?'':s).replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/ /g,' ').replace(/[^\x09\x0A\x20-\x7E¡-ÿ]/g,'?');
+}
+function fmtDate(iso){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');if(!m)return iso||'-';const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return `${+m[3]} ${M[+m[2]-1]} ${m[1]}`;}
+function getReadings(){
+  const f=state.fields;
+  return [
+    {k:'adult',name:'Adult pool temperature'},
+    {k:'main',name:'Main pool temperature'},
+    {k:'kids',name:'Kids pool temperature'},
+    {k:'sea',name:'Sea temperature'}
+  ].map(r=>{
+    const raw=f['rd_'+r.k];
+    const val=(raw!==undefined&&String(raw).trim()!==''&&Number.isFinite(Number(raw)))?Number(raw):null;
+    return {...r,unit:'°C',range:'Not specified',val,ok:null};
+  });
+}
+function buildPdf(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4',compress:true});
+  const W=210,H=297,M=14,CW=W-2*M,TOP=21,BOT=H-19;
+  const COL={navy:[10,51,80],navy2:[7,35,56],teal:[10,138,163],ink:[18,34,48],mut:[86,107,122],line:[211,223,230],pale:[243,247,250],
+    ok:[21,122,73],okBg:[220,243,230],bad:[192,38,45],badBg:[253,234,234],na:[93,111,125],naBg:[232,238,242],warn:[154,98,0],warnBg:[255,242,214],white:[255,255,255]};
+  const f=state.fields, secs=allSections(), items=allItems();
+  const now=new Date(), p2=n=>String(n).padStart(2,'0');
+  const reportId=`PBI-${(f.insp_date||'').replace(/-/g,'')}-${(f.insp_time||'').replace(':','')}`;
+  const venue=clean(f.venue||'').trim();
+  let y=0;
+  const tc=a=>doc.setTextColor(a[0],a[1],a[2]), fc=a=>doc.setFillColor(a[0],a[1],a[2]), dc=a=>doc.setDrawColor(a[0],a[1],a[2]);
+  const font=(st,sz)=>{doc.setFont('helvetica',st);doc.setFontSize(sz);};
+  const wrap=(t,w)=>{const out=[];String(clean(t)).split('\n').forEach(par=>{const l=doc.splitTextToSize(par||' ',w);out.push(...l);});return out;};
+  const fit=(t,w)=>{t=clean(t);if(doc.getTextWidth(t)<=w)return t;while(t.length&&doc.getTextWidth(t+'...')>w)t=t.slice(0,-1);return t+'...';};
+  const np=()=>{doc.addPage();y=TOP;};
+  const need=h=>{if(y+h>BOT)np();};
+
+  /* score */
+  const all=counts(items), scored=all.S+all.U, score=scored?Math.round(all.S/scored*100):100;
+  const readings=getReadings(), oor=readings.filter(r=>r.ok===false);
+  const action=all.U>0||oor.length>0;
+
+  /* ===== Page 1 header band ===== */
+  // Clean rectangular navy header. Report information begins BELOW the band.
+  fc(COL.navy);doc.rect(0,0,W,44,'F');
+  tc(COL.white);font('bold',7.5);doc.text('HEALTH, SAFETY & OPERATIONS',M,14,{charSpace:.9});
+  font('bold',23);doc.text('Pool & Beach Inspection Report',M,29);
+  font('normal',10.5);tc([196,217,229]);
+  doc.text(fit(`${f.insp_type||'Opening'} inspection${venue?'  |  '+venue:''}`,CW-60),M,37.5);
+  y=55;
+
+  /* Read-only report information. These values are printed once as normal PDF
+     page text, never as interactive AcroForm controls. Only corrective actions
+     later in the document are fillable. */
+  const headerRows=[
+    [['Inspection date',fmtDate(f.insp_date)],['Time',f.insp_time||''],['Inspection type',f.insp_type||'Opening']],
+    [['Inspected by',clean(f.insp_by||'')],['Position',clean(f.insp_title||'')],['Weather',clean(f.weather||'')]],
+    [['Sea condition',clean(f.sea||'')],['Beach flag displayed',clean(f.flag||'')],['Resort',venue]]
+  ];
+  const tableRowH=12.8, tableH=tableRowH*3, tableColW=CW/3;
+  fc(COL.white);dc(COL.line);doc.setLineWidth(.3);
+  doc.roundedRect(M,y,CW,tableH,2.3,2.3,'FD');
+  for(let j=1;j<3;j++){
+    doc.line(M+j*tableColW,y,M+j*tableColW,y+tableH);
+    doc.line(M,y+j*tableRowH,M+CW,y+j*tableRowH);
+  }
+  headerRows.forEach((row,ri)=>row.forEach(([label,value],ci)=>{
+    const x=M+ci*tableColW, top=y+ri*tableRowH;
+    tc(COL.mut);font('bold',6.9);
+    doc.text(label.toUpperCase(),x+tableColW/2,top+3.5,{align:'center',charSpace:.35});
+    tc(COL.ink);font('bold',9);
+    doc.text(fit(String(value||''),tableColW-7),x+tableColW/2,top+9.1,{align:'center'});
+  }));
+  y+=tableH+4;
+
+  /* status banner */
+  const bc=COL.navy; fc(bc);doc.roundedRect(M,y,CW,15,2.5,2.5,'F');
+  tc(COL.white);font('bold',12);
+  doc.text(action?'ACTION REQUIRED':'SATISFACTORY - NO ACTIONS REQUIRED',M+6,y+6.6);
+  font('normal',8.5);
+  const why=action?[all.U?`${all.U} unsatisfied item${all.U>1?'s':''}`:'',oor.length?`${oor.length} water reading${oor.length>1?'s':''} out of range`:''].filter(Boolean).join('  |  '):`All ${scored} assessed items satisfactory`;
+  doc.text(fit(why,CW-45),M+6,y+11.6);
+  font('bold',20);doc.text(score+'%',W-M-6,y+9.8,{align:'right'});
+  font('normal',6.5);doc.text('COMPLIANCE',W-M-6,y+13.4,{align:'right',charSpace:.5});
+  y+=21;
+
+  /* stat boxes */
+  const bw=(CW-3*3)/4;
+  [['Items inspected',String(all.n),COL.navy,COL.pale],['Satisfied',String(all.S),COL.ok,COL.okBg],['Unsatisfied',String(all.U),COL.bad,COL.badBg],['Not applicable',String(all.NA),COL.na,COL.naBg]].forEach((s,i)=>{
+    const x=M+i*(bw+3); fc(s[3]);doc.roundedRect(x,y,bw,17,2,2,'F');
+    font('bold',18);tc(s[2]);doc.text(s[1],x+bw/2,y+9.8,{align:'center'});
+    font('bold',6.5);tc(COL.mut);doc.text(s[0].toUpperCase(),x+bw/2,y+14.2,{align:'center',charSpace:.4});
+  });
+  y+=21;
+  /* proportion bar */
+  fc(COL.naBg);doc.roundedRect(M,y,CW,3,1.5,1.5,'F');
+  let bx=M; [[all.S,COL.ok],[all.U,COL.bad],[all.NA,COL.na]].forEach(([n,c])=>{const w=all.n?CW*n/all.n:0;if(w>0){fc(c);doc.rect(bx,y,w,3,'F');bx+=w;}});
+  y+=11;
+
+  /* section summary table */
+  font('bold',11);tc(COL.navy);doc.text('Section summary',M,y);y+=3.5;
+  const sc=[[M+3,'Section','left'],[M+112,'Items','center'],[M+128,'Sat.','center'],[M+143,'Unsat.','center'],[M+159,'N/A','center'],[W-M-3,'Score','right']];
+  fc(COL.navy);doc.rect(M,y,CW,6.5,'F');tc(COL.white);font('bold',7);
+  sc.forEach(c=>doc.text(c[1].toUpperCase(),c[0],y+4.4,{align:c[2],charSpace:.3}));y+=6.5;
+  secs.forEach((s,i)=>{
+    const c=counts(s.items), sco=(c.S+c.U)?Math.round(c.S/(c.S+c.U)*100):null;
+    if(i%2===0){fc(COL.pale);doc.rect(M,y,CW,6.6,'F');}
+    font('normal',10);tc(COL.ink);doc.text(fit(`${i+1}. ${s.title}`,104),M+3,y+4.5);
+    doc.text(String(c.n),sc[1][0],y+4.5,{align:'center'});
+    tc(COL.ok);doc.text(String(c.S),sc[2][0],y+4.5,{align:'center'});
+    tc(c.U?COL.bad:COL.mut);font(c.U?'bold':'normal',8.5);doc.text(String(c.U),sc[3][0],y+4.5,{align:'center'});
+    font('normal',8.5);tc(COL.mut);doc.text(String(c.NA),sc[4][0],y+4.5,{align:'center'});
+    font('bold',8.5);tc(sco===null?COL.mut:(sco===100?COL.ok:COL.bad));doc.text(sco===null?'-':sco+'%',sc[5][0],y+4.5,{align:'right'});
+    y+=6.6;
+  });
+  dc(COL.line);doc.line(M,y,M+CW,y);y+=9;
+
+  /* readings table */
+  need(46);
+  font('bold',11);tc(COL.navy);doc.text('Water readings',M,y);y+=3.5;
+  fc(COL.navy);doc.rect(M,y,CW,6.5,'F');tc(COL.white);font('bold',7);
+  doc.text('PARAMETER',M+3,y+4.4,{charSpace:.3});doc.text('READING',M+80,y+4.4,{charSpace:.3});doc.text('REFERENCE RANGE',M+112,y+4.4,{charSpace:.3});doc.text('STATUS',W-M-3,y+4.4,{align:'right',charSpace:.3});y+=6.5;
+  readings.forEach((r,i)=>{
+    if(i%2===0){fc(COL.pale);doc.rect(M,y,CW,6.6,'F');}
+    font('normal',10);tc(COL.ink);doc.text(r.name,M+3,y+4.5);
+    doc.text(r.val===null?'Not recorded':`${r.val} ${r.unit}`.trim(),M+80,y+4.5);
+    tc(COL.mut);doc.text(r.range,M+112,y+4.5);
+    font('bold',8);
+    if(r.ok===null){tc(COL.mut);doc.text(r.val===null?'-':'Recorded',W-M-3,y+4.5,{align:'right'});}
+    else{tc(r.ok?COL.ok:COL.bad);doc.text(r.ok?'WITHIN RANGE':'OUT OF RANGE',W-M-3,y+4.5,{align:'right'});}
+    y+=6.6;
+  });
+  dc(COL.line);doc.line(M,y,M+CW,y);y+=4;
+  font('normal',6.8);tc(COL.mut);
+  doc.text(wrap('Temperature readings are informational; no operating limits have been specified for these pools.',CW),M,y);
+
+  /* ===== Detailed checklist ===== */
+  np();
+  font('bold',14);tc(COL.navy);doc.text('Detailed inspection checklist',M,y+2);y+=8;
+  const NUMW=11, RESW=32, TX=M+NUMW, TW=CW-NUMW-RESW-4, FW=CW-NUMW;
+  const photos=[]; const actions=[];
+  secs.forEach((s,si)=>{
+    const sc2=counts(s.items);
+    need(9+16);
+    fc(COL.pale);dc(COL.line);doc.setLineWidth(.25);doc.rect(M,y,CW,8.2,'FD');
+    fc(COL.teal);doc.rect(M,y,1.8,8.2,'F');
+    font('bold',10);tc(COL.navy);doc.text(fit(`${si+1}. ${s.title}`,CW-60),M+5,y+5.5);
+    font('normal',7.5);tc(COL.mut);doc.text(`${sc2.S} satisfied  |  ${sc2.U} unsatisfied  |  ${sc2.NA} N/A`,W-M-3,y+5.4,{align:'right'});
+    y+=8.2;
+    s.items.forEach((it,ii)=>{
+      const a=state.answers[it.id]||{}, ref=`${si+1}.${ii+1}`;
+      font('bold',10);const tl=wrap(it.t,TW);
+      font('normal',10);const dl=it.d?wrap(it.d,TW):[];
+      let fl=[],fh=0;
+      if(a.r==='U'){font('normal',10);fl=wrap(a.c||'-',FW-8);fh=9+fl.length*5.3+3;}
+      const h=3.2+tl.length*4.2+dl.length*5.4+2.6+(fh?fh+1.5:0);
+      need(h);
+      const top=y;
+      font('bold',8.5);tc(COL.mut);doc.text(ref,M+2,top+6.2);
+      font('bold',10);tc(COL.ink);doc.text(tl,TX,top+6.2,{lineHeightFactor:1.25});
+      let ty=top+6.2+(tl.length-1)*4.2;
+      if(dl.length){font('normal',10);tc(COL.mut);doc.text(dl,TX,ty+5.1,{lineHeightFactor:1.2});ty+=5.1+(dl.length-1)*5.4;}
+      /* result pill */
+      const px=W-M-RESW, py=top+2.8;
+      if(a.r==='S'){fc(COL.okBg);doc.roundedRect(px,py,RESW,6.4,3.2,3.2,'F');tc(COL.ok);font('bold',7.4);doc.text('SATISFIED',px+RESW/2,py+4.35,{align:'center',charSpace:.4});}
+      else if(a.r==='U'){fc(COL.bad);doc.roundedRect(px,py,RESW,6.4,3.2,3.2,'F');tc(COL.white);font('bold',7.4);doc.text('UNSATISFIED',px+RESW/2,py+4.35,{align:'center',charSpace:.4});}
+      else{fc(COL.naBg);doc.roundedRect(px,py,RESW,6.4,3.2,3.2,'F');tc(COL.na);font('bold',7.4);doc.text('N/A',px+RESW/2,py+4.35,{align:'center',charSpace:.4});}
+      if(fh){
+        const by=ty+3.2; fc(COL.badBg);doc.roundedRect(TX,by,FW,fh,1.6,1.6,'F');fc(COL.bad);doc.rect(TX,by,1.4,fh,'F');
+        font('bold',6.5);tc(COL.bad);doc.text('FINDING  |  PRIORITY: '+(a.p||'Medium').toUpperCase()+(a.ph&&a.ph.length?'  |  '+a.ph.length+' PHOTO'+(a.ph.length>1?'S':'')+' IN APPENDIX':''),TX+4.5,by+4.4,{charSpace:.3});
+        font('normal',10);tc(COL.ink);doc.text(fl,TX+4.5,by+10.2,{lineHeightFactor:1.2});
+        actions.push({ref,t:it.t,c:a.c||'',p:a.p||'Medium'});
+        (a.ph||[]).forEach((ph,k)=>photos.push({ref,t:it.t,ph,k:k+1}));
+      }
+      y=top+h;
+      dc(COL.line);doc.setLineWidth(.2);doc.line(M,y-.6,M+CW,y-.6);
+    });
+    y+=5;
+  });
+
+  /* ===== Corrective action follow-up: real PDF AcroForm input widgets ===== */
+  if(actions.length){
+    np();
+    tc(COL.navy);font('bold',15);doc.text('Corrective Action Register',M,y+2);y+=8;
+    tc(COL.mut);font('normal',8.4);
+    doc.text('Unsatisfied findings only  |  Complete the action fields in the generated PDF.',M,y+2);y+=10;
+
+    let fieldCount=0;
+    const addTextField=(name,x,top,w,h,multiline=false,center=false)=>{
+      const fld=new doc.AcroFormTextField();
+      fld.fieldName=name;
+      fld.Rect=[x,top,w,h];
+      fld.fontSize=multiline?11:10.5;
+      fld.multiline=multiline;
+      fld.readOnly=false;
+      fld.required=false;
+      fld.value='';
+      fld.defaultValue='';
+      fld.textColor='#102E42';
+      fld.fillColor='#FFFFFF';
+      fld.borderColor='#FFFFFF';
+      fld.borderWidth=0;
+      // PDF /Q=1 explicitly centers text entered in Acrobat Reader.
+      if(center){fld.textAlign='center';fld.Q=1;}
+      doc.addField(fld);
+      fieldCount++;
+    };
+    const drawField=(x,yy,w,h)=>{
+      fc(COL.white);dc([170,190,203]);doc.setLineWidth(.3);
+      doc.roundedRect(x,yy,w,h,1.8,1.8,'FD');
+    };
+    actions.forEach((a,i)=>{
+      const nameLines=wrap(a.t,CW-43);
+      const findingLines=wrap(a.c||'',CW-12);
+      const findingH=6+nameLines.length*4.1+Math.max(1,findingLines.length)*4.1;
+      const topH=Math.max(23,findingH);
+      const cardH=topH+11+26+8+14+7;
+      if(y+cardH>BOT)np();
+      const top=y,id=String(i+1).padStart(3,'0');
+      // One clean action card per unsatisfied issue.
+      fc(COL.white);dc(COL.line);doc.setLineWidth(.3);
+      doc.roundedRect(M,top,CW,cardH,2.2,2.2,'FD');
+      fc(COL.navy);doc.rect(M,top,CW,10,'F');
+      tc(COL.white);font('bold',9);
+      doc.text(fit(`${a.ref}  |  ${a.t}`,CW-37),M+4,top+6.5);
+      font('bold',7.2);doc.text('UNSATISFIED',M+CW-4,top+6.3,{align:'right'});
+      tc(COL.mut);font('bold',7.3);
+      doc.text('INSPECTION FINDING',M+4,top+15);
+      tc(COL.ink);font('normal',9);
+      doc.text(findingLines,M+4,top+20,{lineHeightFactor:1.2});
+      const actionLabelY=top+topH+8.5;
+      tc(COL.navy);font('bold',8.5);
+      doc.text('CORRECTIVE ACTION',M+4,actionLabelY);
+      const actionY=actionLabelY+3.2;
+      drawField(M+4,actionY,CW-8,24);
+      // Blank multiline field is editable after downloading/opening PDF.
+      addTextField('corrective_action_'+id,M+5.2,actionY+1.1,CW-10.4,21.8,true,false);
+
+      const rowY=actionY+28;
+      const leftX=M+4,personW=78,dateX=leftX+personW+5,dateW=52;
+      const cbX=dateX+dateW+8;
+      tc(COL.navy);font('bold',8);
+      doc.text('RESPONSIBLE PERSON',leftX+personW/2,rowY,{align:'center'});
+      doc.text('TARGET DATE',dateX+dateW/2,rowY,{align:'center'});
+      drawField(leftX,rowY+2,personW,11);
+      drawField(dateX,rowY+2,dateW,11);
+      addTextField('responsible_person_'+id,leftX+1,rowY+3,personW-2,9,false,true);
+      addTextField('target_date_'+id,dateX+1,rowY+3,dateW-2,9,false,true);
+      // Draw the checkbox outline in all PDF readers; AcroForm is interactive on top.
+      dc([117,148,170]);doc.setLineWidth(.35);doc.rect(cbX,rowY+4,6,6,'S');
+      // Checkbox aligns with target date INPUT, to its immediate right.
+      const tick=new doc.AcroFormCheckBox();
+      tick.fieldName='completed_'+id;
+      tick.Rect=[cbX,rowY+4,6,6];
+      tick.readOnly=false;
+      tick.appearanceState='Off';
+      tick.borderWidth=0.4;
+      tick.borderColor='#7594AA';
+      tick.fillColor='#FFFFFF';
+      doc.addField(tick);
+      fieldCount++;
+      tc(COL.ink);font('normal',8.4);
+      doc.text('Completed',cbX+8,rowY+8.4);
+      y=top+cardH+5;
+    });
+    if(fieldCount!==actions.length*4)throw new Error('Corrective action PDF fields could not be created.');
+    y+=2;
+  }
+
+  /* ===== Photo appendix ===== */
+  if(photos.length){
+    np();
+    font('bold',14);tc(COL.navy);doc.text('Appendix: photographic evidence',M,y+2);y+=9;
+    let col=0;
+    photos.forEach((p,i)=>{
+      if(col===0)need(78);
+      const x=M+col*94, bw2=88, bh=62;
+      let w=bw2,h=w*p.ph.h/p.ph.w; if(h>bh){h=bh;w=h*p.ph.w/p.ph.h;}
+      fc(COL.pale);dc(COL.line);doc.setLineWidth(.25);doc.roundedRect(x,y,bw2,bh,1.5,1.5,'FD');
+      try{doc.addImage(p.ph.d,'JPEG',x+(bw2-w)/2,y+(bh-h)/2,w,h,undefined,'FAST');}catch(_){}
+      font('bold',7.6);tc(COL.ink);doc.text(fit(`Ref ${p.ref}  |  ${p.t}`,bw2),x,y+bh+4.5);
+      font('normal',7);tc(COL.mut);doc.text(`Photo ${p.k}`,x,y+bh+8.2);
+      col++; if(col===2||i===photos.length-1){col=0;y+=74;}
+    });
+  }
+
+  /* ===== Sign-off ===== */
+  need(72);
+  if(y>TOP+2)y+=4;
+  font('bold',14);tc(COL.navy);doc.text('Declaration & sign-off',M,y+2);y+=8;
+  font('normal',9);tc(COL.ink);
+  const decl=wrap('I confirm that this inspection was carried out on the date and time stated, that each item was assessed in person, and that the findings recorded above are accurate to the best of my knowledge.',CW);
+  doc.text(decl,M,y+3,{lineHeightFactor:1.3});y+=decl.length*4.4+6;
+  const bhei=48, sig=signaturePng();
+  fc(COL.white);dc(COL.line);doc.setLineWidth(.3);doc.roundedRect(M,y,CW,bhei,2.5,2.5,'FD');
+  font('bold',6.8);tc(COL.teal);doc.text('INSPECTOR SIGNATURE',M+6,y+7,{charSpace:.5});
+  if(sig){doc.addImage(sig,'PNG',M+6,y+9.5,88,27.5);}
+  dc(COL.mut);doc.setLineWidth(.25);doc.line(M+6,y+38,M+104,y+38);
+  font('normal',6.8);tc(COL.mut);doc.text('SIGNATURE',M+6,y+42,{charSpace:.4});
+  const rx=M+116;
+  [['INSPECTED BY',clean(f.insp_by||'-')],['POSITION',clean(f.insp_title||'-')],['DATE & TIME',`${fmtDate(f.insp_date)}, ${f.insp_time||''}`]].forEach((r,i)=>{
+    const ry=y+12+i*12; font('bold',6.5);tc(COL.mut);doc.text(r[0],rx,ry,{charSpace:.5});font('bold',9.5);tc(COL.ink);doc.text(fit(r[1],CW-116-6),rx,ry+4.8);
+  });
+  y+=bhei+4;
+
+  /* ===== Headers / footers ===== */
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){
+    doc.setPage(i);
+    if(i>1){fc(COL.navy);doc.rect(0,0,W,11,'F');fc(COL.teal);doc.rect(0,11,W,.9,'F');
+      tc(COL.white);font('bold',7.5);doc.text('POOL & BEACH INSPECTION REPORT',M,7,{charSpace:.5});
+      font('normal',7.5);doc.text(fmtDate(f.insp_date),W-M,7,{align:'right'});}
+    dc(COL.line);doc.setLineWidth(.25);doc.line(M,H-14,W-M,H-14);
+    font('normal',7);tc(COL.mut);
+    doc.text(fit(venue||'Pool & Beach Inspection',110),M,H-9.6);
+    doc.text(`Electronically generated ${now.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]} ${now.getFullYear()}, ${p2(now.getHours())}:${p2(now.getMinutes())}  |  Confidential`,M,H-6);
+    font('bold',7.5);tc(COL.navy);doc.text(`Page ${i} of ${n}`,W-M,H-9.6,{align:'right'});
+  }
+  doc.setProperties({title:'Pool & Beach Inspection Report',subject:'Pool and beach safety inspection',author:clean(f.insp_by||''),creator:'Pool & Beach Inspection Form'});
+  return {doc,reportId,summary:{...all,score,action}};
+}
+
+/* ---------- Generate ---------- */
+function toast(msg){$('#msg').textContent=msg;}
+$('#genBtn').addEventListener('click',()=>{
+  const errs=validate();
+  if(errs.length){
+    const un=errs.filter(e=>e.msg==='unanswered').length, cm=errs.filter(e=>e.msg==='comment').length, det=errs.filter(e=>e.msg==='details'||e.msg==='signature').length;
+    toast([det?`${det} detail${det>1?'s':''} missing`:'',un?`${un} item${un>1?'s':''} unanswered`:'',cm?`${cm} comment${cm>1?'s':''} required`:''].filter(Boolean).join(' · '));
+    const first=errs[0].el; first.scrollIntoView({behavior:'smooth',block:'center'});
+    if(first.focus&&first.tagName!=='LI'&&first.tagName!=='CANVAS')setTimeout(()=>first.focus({preventScroll:true}),350);
+    return;
+  }
+  toast('');
+  const b=$('#genBtn'); b.disabled=true;
+  setTimeout(()=>{
+    try{
+      if(!window.jspdf)throw new Error('The PDF library did not load. Check your internet connection and reload the page.');
+      const r=buildPdf(); const name=`Pool_Beach_Inspection_${state.fields.insp_date}_${(state.fields.insp_time||'').replace(':','')}.pdf`;
+      // Confirm that the generated PDF actually contains AcroForm annotations.
+      // A drawn white rectangle by itself is not an editable PDF field.
+      const pdfText=r.doc.output();
+      if(r.summary.U>0){
+        const acro=(pdfText.match(/\/AcroForm\b/g)||[]).length;
+        const textFields=(pdfText.match(/\/FT\s*\/Tx\b/g)||[]).length;
+        const checkFields=(pdfText.match(/\/FT\s*\/Btn\b/g)||[]).length;
+        if(!acro||textFields<r.summary.U*3||checkFields<r.summary.U){
+          throw new Error('PDF form verification failed: fillable text or checkbox fields are missing.');
+        }
+      }
+      if(/\/T\s*\(inspection_(?:date|time|type|inspector|position|weather|sea|flag|resort)\)/.test(pdfText)){
+        throw new Error('Report information must remain read-only.');
+      }
+      const blob=r.doc.output('blob');
+      if(lastPdf&&lastPdf.url)URL.revokeObjectURL(lastPdf.url);
+      lastPdf={blob,url:URL.createObjectURL(blob),name};
+      download();
+      $('#mSummary').textContent=r.summary.action?`Action required · ${r.summary.U} unsatisfied`:`Satisfactory · ${r.summary.score}% compliance`;
+      $('#mFile').textContent=name+' · '+r.doc.getNumberOfPages()+' pages';
+      $('#mOpen').href=lastPdf.url; $('#modal').hidden=false; $('#mDl').focus();
+    }catch(err){toast('Could not create the PDF: '+(err&&err.message?err.message:err));console.error(err);}
+    finally{b.disabled=false;}
+  },30);
+});
+function download(){
+  if(!lastPdf)return; const a=document.createElement('a'); a.href=lastPdf.url; a.download=lastPdf.name; document.body.appendChild(a); a.click(); a.remove();
+}
+$('#mDl').addEventListener('click',download);
+$('#mClose').addEventListener('click',()=>{$('#modal').hidden=true;});
+$('#mNew').addEventListener('click',()=>{$('#modal').hidden=true;newInspection();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#modal').hidden=true;});
+
+/* ---------- Init ---------- */
+load(); defaults(); applyFields(); renderSections(); updateRid();
+window.addEventListener('resize',sizePad); sizePad();
+if(window.ResizeObserver)new ResizeObserver(sizePad).observe(pad.parentElement);
+})();
+</script>
+</body>
+</html>
