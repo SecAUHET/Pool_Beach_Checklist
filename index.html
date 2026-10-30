@@ -374,7 +374,7 @@ a.btn{text-decoration:none;color:inherit}
   <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <div class="okmark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
     <h3 id="mTitle">Report generated</h3>
-    <div><div id="mSummary" style="font-weight:600"></div><div class="fname" id="mFile"></div><p class="sub">Only Unsatisfied checklist findings appear. The Corrective Action, Responsible Person, Target Date and Completed checkbox are genuine fillable PDF form controls. Type into the generated PDF and save the filled report. Open the downloaded file in Adobe Acrobat or another compatible PDF editor, complete the fields, then press Ctrl+S to save changes to that same file. If typing is unavailable in the browser viewer, download the PDF and open it in Adobe Acrobat Reader; browser previews vary in form support.</p></div>
+    <div><div id="mSummary" style="font-weight:600"></div><div class="fname" id="mFile"></div><p class="sub">Only Unsatisfied checklist findings appear. The Fixed Date (dd/mmm/yyyy, with a calendar picker in Adobe Acrobat/Reader) and the Completed checkbox are genuine fillable PDF form controls. Type into the generated PDF and save the filled report. Open the downloaded file in Adobe Acrobat or another compatible PDF editor, complete the fields, then press Ctrl+S to save changes to that same file. If typing is unavailable in the browser viewer, download the PDF and open it in Adobe Acrobat Reader; browser previews vary in form support.</p></div>
     <div class="acts">
       <button class="btn primary" id="mDl" type="button">Download PDF again</button>
       <a class="btn" id="mOpen" href="#" target="_blank" rel="noopener">Open PDF in new tab</a>
@@ -853,9 +853,9 @@ function buildPdf(){
     np();
     tc(COL.navy);font('bold',15);doc.text('Corrective Action Register',M,y+2);y+=8;
     tc(COL.mut);font('normal',8.4);
-    doc.text('Unsatisfied findings only  |  Complete the action fields in the generated PDF.',M,y+2);y+=10;
+    doc.text('Unsatisfied findings only  |  Enter the fixed date (dd/mmm/yyyy) and tick Completed in the generated PDF.',M,y+2);y+=10;
 
-    let fieldCount=0;
+    let fieldCount=0; const dateFields=[];
     const addTextField=(name,x,top,w,h,multiline=false,center=false)=>{
       const fld=new doc.AcroFormTextField();
       fld.fieldName=name;
@@ -880,14 +880,13 @@ function buildPdf(){
       doc.roundedRect(x,yy,w,h,1.8,1.8,'FD');
     };
     actions.forEach((a,i)=>{
-      const nameLines=wrap(a.t,CW-43);
-      const findingLines=wrap(a.c||'',CW-12);
-      const findingH=6+nameLines.length*4.1+Math.max(1,findingLines.length)*4.1;
-      const topH=Math.max(23,findingH);
-      const cardH=topH+11+26+8+14+7;
+      const colW=76, leftW=CW-colW-8;
+      const findingLines=wrap(a.c||'',leftW);
+      const bodyH=Math.max(20,12+findingLines.length*4.3);
+      const cardH=10+bodyH+3;
       if(y+cardH>BOT)np();
       const top=y,id=String(i+1).padStart(3,'0');
-      // One clean action card per unsatisfied issue.
+      // One clean action card per unsatisfied issue: finding left, action column right.
       fc(COL.white);dc(COL.line);doc.setLineWidth(.3);
       doc.roundedRect(M,top,CW,cardH,2.2,2.2,'FD');
       fc(COL.navy);doc.rect(M,top,CW,10,'F');
@@ -895,33 +894,23 @@ function buildPdf(){
       doc.text(fit(`${a.ref}  |  ${a.t}`,CW-37),M+4,top+6.5);
       font('bold',7.2);doc.text('UNSATISFIED',M+CW-4,top+6.3,{align:'right'});
       tc(COL.mut);font('bold',7.3);
-      doc.text('INSPECTION FINDING',M+4,top+15);
+      doc.text('INSPECTION FINDING',M+4,top+15.5);
       tc(COL.ink);font('normal',9);
-      doc.text(findingLines,M+4,top+20,{lineHeightFactor:1.2});
-      const actionLabelY=top+topH+8.5;
-      tc(COL.navy);font('bold',8.5);
-      doc.text('CORRECTIVE ACTION',M+4,actionLabelY);
-      const actionY=actionLabelY+3.2;
-      drawField(M+4,actionY,CW-8,24);
-      // Blank multiline field is editable after downloading/opening PDF.
-      addTextField('corrective_action_'+id,M+5.2,actionY+1.1,CW-10.4,21.8,true,false);
+      doc.text(findingLines,M+4,top+20.5,{lineHeightFactor:1.2});
 
-      const rowY=actionY+28;
-      const leftX=M+4,personW=78,dateX=leftX+personW+5,dateW=52;
-      const cbX=dateX+dateW+8;
-      tc(COL.navy);font('bold',8);
-      doc.text('RESPONSIBLE PERSON',leftX+personW/2,rowY,{align:'center'});
-      doc.text('TARGET DATE',dateX+dateW/2,rowY,{align:'center'});
-      drawField(leftX,rowY+2,personW,11);
-      drawField(dateX,rowY+2,dateW,11);
-      addTextField('responsible_person_'+id,leftX+1,rowY+3,personW-2,9,false,true);
-      addTextField('target_date_'+id,dateX+1,rowY+3,dateW-2,9,false,true);
-      // Draw the checkbox outline in all PDF readers; AcroForm is interactive on top.
-      dc([117,148,170]);doc.setLineWidth(.35);doc.rect(cbX,rowY+4,6,6,'S');
-      // Checkbox aligns with target date INPUT, to its immediate right.
+      // Right action column: Fixed Date field and Completed checkbox share one centre line.
+      const sx=M+CW-colW;
+      dc(COL.line);doc.setLineWidth(.3);doc.line(sx,top+13,sx,top+cardH-3);
+      const cy=top+10+bodyH/2+0.5;
+      const dateX=sx+6,dateW=38,dateH=9;
+      drawField(dateX,cy-dateH/2,dateW,dateH);
+      addTextField('fixed_date_'+id,dateX+1,cy-dateH/2+1,dateW-2,dateH-2,false,true);
+      dateFields.push('fixed_date_'+id);
+      const cbS=7, cbX=dateX+dateW+6, boxY=cy-cbS/2;
+      fc(COL.white);dc([117,148,170]);doc.setLineWidth(.35);doc.roundedRect(cbX,boxY,cbS,cbS,.8,.8,'FD');
       const tick=new doc.AcroFormCheckBox();
       tick.fieldName='completed_'+id;
-      tick.Rect=[cbX,rowY+4,6,6];
+      tick.Rect=[cbX,boxY,cbS,cbS];
       tick.readOnly=false;
       tick.appearanceState='Off';
       tick.borderWidth=0.4;
@@ -930,10 +919,12 @@ function buildPdf(){
       doc.addField(tick);
       fieldCount++;
       tc(COL.ink);font('normal',8.4);
-      doc.text('Completed',cbX+8,rowY+8.4);
+      doc.text('Completed',cbX+cbS+2,cy+1.1);
       y=top+cardH+5;
     });
-    if(fieldCount!==actions.length*4)throw new Error('Corrective action PDF fields could not be created.');
+    // Acrobat/Reader: format as dd/mmm/yyyy and show the calendar date picker.
+    doc.addJS('(function(){var f='+JSON.stringify(dateFields)+';var fmt="if(event.value===\'\'){event.value=\'Fixed date\';event.target.textColor=color.ltGray;}else{AFDate_FormatEx(\'dd/mmm/yyyy\');event.target.textColor=color.black;}";f.forEach(function(n){var q=this.getField(n);if(!q)return;q.setAction("Format",fmt);q.setAction("Keystroke",\'AFDate_KeystrokeEx("dd/mmm/yyyy")\');q.userName="Fixed date (dd/mmm/yyyy)";},this);})();');
+    if(fieldCount!==actions.length*2)throw new Error('Corrective action PDF fields could not be created.');
     y+=2;
   }
 
@@ -1014,7 +1005,7 @@ $('#genBtn').addEventListener('click',()=>{
         const acro=(pdfText.match(/\/AcroForm\b/g)||[]).length;
         const textFields=(pdfText.match(/\/FT\s*\/Tx\b/g)||[]).length;
         const checkFields=(pdfText.match(/\/FT\s*\/Btn\b/g)||[]).length;
-        if(!acro||textFields<r.summary.U*3||checkFields<r.summary.U){
+        if(!acro||textFields<r.summary.U||checkFields<r.summary.U){
           throw new Error('PDF form verification failed: fillable text or checkbox fields are missing.');
         }
       }
